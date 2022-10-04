@@ -1,0 +1,79 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Read the data into R
+train <-  read.csv("AutoTrain.csv", row.names = 1)
+test <-  read.csv("AutoTest.csv", row.names = 1)
+```
+```{r}
+library(tree)
+library(ISLR)
+library(rpart)
+library(dplyr)
+```
+```{r}
+attach(train)
+str(train)
+```
+```{r}
+# load the necessary package
+library(gbm)
+library(caret)
+```
+```{r}
+set.seed(123)
+boost_train <- gbm(origin~.-name, data = train, distribution = "gaussian")
+#Summary gives a table of Variable Importance and a plot of Variable Importance
+summary(boost_train)
+```
+#### (2). Experiment with different tree depths, shrinkage parameters and the number of trees.
+```{r}
+# Find the best Tune for tree depths, shrinkage parameters ans the number of trees
+gbm_grid =  expand.grid(interaction.depth = 1:5,
+                        n.trees = (1:10) * 100,
+                        shrinkage = c(0.001, 0.01, 0.1),
+                        n.minobsinnode = 10)
+gbm_tune = train(origin ~ .-name, data = train,
+                      method = "gbm",
+                      verbose = FALSE,
+                      tuneGrid = gbm_grid)
+plot(gbm_tune)
+```
+```{r}
+gbm_tune$bestTune
+```
+```{r}
+# change the shrinkage factor, tree depth and the number of trees and fit the training set.
+set.seed(123)
+boost.train1 <- gbm(origin~.-name, data = train, distribution = "gaussian", n.trees = 200, interaction.depth = 2, shrinkage = 0.1)
+summary(boost.train1)
+```
+Now, Find the train and test misclassifications errors.
+However, my confusion matrix looks so weird, I do not know how to figure it out.
+
+```{r}
+# train
+yhat.boost_trn <-  predict(boost.train1, newdata = train, n.trees = 200, "response")
+
+table(predicted = yhat.boost_trn, actual = train$origin)
+# train accuracy
+accuracy(predicted = yhat.boost_trn, actual = train$origin)
+# train misclassifications errors
+train_mis_boost <- 1 - accuracy(predicted = yhat.boost_trn, actual = train$origin)
+cat("train Misclassifications errors:",train_mis_boost,"\n")
+
+# test
+yhat.boost_tst <-  predict(boost.train1, newdata = test, n.trees = 200, "response")
+table(predicted = yhat.boost_tst, actual = test$origin)
+# test accuracy
+accuracy(predicted = yhat.boost_tst, actual = test$origin)
+# test misclassification errors
+test_mis_boost <- 1 - accuracy(predicted = yhat.boost_tst, actual = test$origin)
+cat("test Misclassifications errors:",test_mis_boost,"\n")
+
+## boosted regression tree test accuracy
+boost_tst_acc <- accuracy(predicted = yhat.boost_tst, actual = test$origin)
+```
